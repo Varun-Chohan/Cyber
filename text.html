@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CYBER HUD | Next-Gen Hacking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+  <style>
+    /* Global + background */
+    html, body {width:100vw; height:100vh; margin:0; padding:0; overflow:hidden; background:#0a1119;}
+    body {font-family:'Montserrat',Arial,sans-serif; letter-spacing:.01em;}
+    #smooth-bg {
+      position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:0; pointer-events:none;
+      background:radial-gradient(ellipse at 60% 38%,#1ff1f4 0%,#13c9ea1a 40%,#145191 80%,#10121e 100%);
+      animation: bgpulse 6s ease-in-out infinite alternate;
+    }
+    @keyframes bgpulse {0%{opacity:1;}100%{opacity:0.97;}}
+    /* Three.js canvas */
+    #jarvis3d {position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:2; pointer-events:none;}
+    /* HUD overlay */
+    #hud-overlay {
+      position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:10;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; pointer-events:none; backdrop-filter:blur(2px);
+    }
+    #hud-overlay .logo {
+      font-family:'Montserrat',sans-serif; color:#16ffe3; font-size:2.3rem; letter-spacing:.45rem;
+      margin-bottom:29px; text-shadow:0 5px 46px #16ffe733,0 2px 8px #0d1842;
+      font-weight:800; opacity:.93; text-transform:uppercase; filter:drop-shadow(0 0 14px #2bedf744);
+    }
+    #hud-overlay .label, #hud-overlay .access, #hud-overlay .loading {
+      font-family:'Roboto Mono',monospace; color:#DBF9FF; font-size:1.12rem; letter-spacing:0.19rem;
+      margin-top:1.6vh; opacity:0; transition:opacity .6s; text-shadow:0 2px 24px #0595c7,0 1px 3px #1bc3ec99;
+      font-weight:500;
+    }
+    #hud-overlay .loading {color:#79fcfd;}
+    #hud-overlay .progress {
+      width:235px; height:15px; margin:21px auto 0 auto; border:2px solid #36fdec;
+      background:linear-gradient(90deg,#1cd1e733 60%,#ddfcff11 100%);
+      border-radius: 9px; align-items:center; overflow:hidden; opacity:0; transition:opacity .4s;
+      box-shadow:0 0 24px #5edffc21; z-index:11;
+    }
+    #hud-overlay .progress .bar {
+      height:100%; width:0%; background:linear-gradient(90deg,#12ffe9 0%,#36fdec 80%,#00aaff 100%);
+      border-radius:9px; box-shadow:0 0 24px #79f6ff88; transition:width .21s;
+    }
+    #hud-overlay .access {
+      color:#2fffa9; font-size:2.04rem; font-weight:700; letter-spacing:.23rem; margin-top:2.5vh;
+      text-shadow:0 2px 26px #5bfffecc,0 2px 11px #14db91; opacity:0; filter:drop-shadow(0 0 20px #25ffbe73);
+      transition:opacity 1s;
+    }
+    #main-login, #main-content {
+      position:absolute; left:0; top:0; width:100vw; min-height:100vh; z-index:20;
+      display:none; align-items:center; justify-content:center; flex-direction: column;
+    }
+    /* Frosted glass login panel */
+    .glass-panel {
+      margin-top:11vh; background:rgba(30,34,48,0.65); border-radius:22px; box-shadow:0 6px 39px #15f7ff25;
+      border:2.3px solid #49f7fe84; padding:2.3rem 2.3rem 2rem 2.3rem; min-width:300px; max-width:94vw;
+      display:flex; flex-direction:column; align-items:center;
+      backdrop-filter:blur(7px);
+    }
+    .panel-title {
+      color:#18e3ff; font-size:2rem; font-family:'Montserrat',sans-serif; letter-spacing:0.21em; font-weight:800;
+      margin-bottom:.5rem; text-align:center; text-shadow:0 1.5px 19px #26eeff44;
+      text-transform:uppercase;
+    }
+    .panel-sub {
+      color:#A6F7FF; font-size:1.11rem; margin-bottom:1.5rem; letter-spacing:0.15em;
+    }
+    .loginform {width:100%; display:flex; flex-direction:column; gap:1.3rem;}
+    .loginform input {
+      background:rgba(11,21,31,0.85); border:2px solid #29eaff; outline:none; border-radius:9px;
+      color:#1ff7fb; font-size:1.1rem; letter-spacing:0.11em; padding:0.7rem 1rem; transition:border .18s;
+    }
+    .loginform input:focus {border-color:#60fff7;}
+    .loginbtn {
+      margin-top:.6rem; background:#15ffef; color:#09141e; border:none; border-radius:8px;
+      font-weight:700; font-size:1.09rem; padding:0.78rem 0; cursor:pointer;
+      letter-spacing:0.13rem; box-shadow:0 2px 13px #60fff7a9; position:relative; overflow:hidden;
+      transition:background .13s, transform .09s;
+    }
+    .loginbtn:active {background:#0bedcd; transform:scale(0.97);}
+    .loginbtn .ripple {
+      position:absolute; border-radius:50%; transform:scale(0);
+      animation:rip .43s linear; background-color:rgba(21,255,239,0.2); pointer-events:none; z-index:10;
+    }
+    @keyframes rip {to{transform:scale(4);opacity:0;}}
+    .loginerr {
+      min-height:1.22em; color:#FF4141; font-size:.99rem; letter-spacing:.12rem;
+      text-shadow:0 2px 10px #22000065; opacity:0; transition:opacity .23s; text-align:center;
+    }
+    .loginerr.show {opacity:1;}
+    /* Dashboard */
+    #main-content {display:none; justify-content:flex-start; align-items:center; background:none;}
+    .dashboard {
+      width:96vw; max-width:1080px; margin:10vh auto 0 auto; display:flex; flex-direction:column; align-items:center;
+    }
+    .dashboard-title{
+      font-size:2.2rem; color:#19f7fb; font-family:'Montserrat',sans-serif;
+      letter-spacing:.15em; font-weight:800; text-shadow:0 2px 24px #1cf8fa54;
+      margin-bottom:.2em; text-transform:uppercase;
+    }
+    .tag-bar{margin: 1.2rem 0 .9rem 0; display:flex; gap:.38rem;}
+    .tag{background:#13f6e9;color:#09141e;font-weight:700;border-radius:4px; font-size:.97rem; padding:.19em .75em;
+      letter-spacing:.13em; text-transform:uppercase; margin-bottom:2px;box-shadow:0 2px 13px #13f6e955;
+    }
+    .cards{width:100%;display:grid;grid-template-columns: repeat(auto-fit,minmax(240px,1fr));gap:1.3rem;}
+    .card{background:rgba(16,34,49,0.92); border:2px solid #39f7fcbd; border-radius:11px;
+      box-shadow:0 3px 22px #0ffbe422,purple 0 0 0 0; color:#A6F7FF; font-size:1rem; padding:1.3rem 1.2rem .9rem 1.2rem;
+      min-height:110px; font-weight:600; position:relative; transition:box-shadow .18s, transform .16s;
+      overflow:hidden; z-index:15;
+    }
+    .card:before {
+      content:""; position:absolute; left:-25px;top:-35px; width:60px;height:60px;
+      background:radial-gradient(circle,#31ffe460 30%,#12baff0c 100%);
+      opacity:0.42; z-index:2; pointer-events:none; filter:blur(6px);
+    }
+    .card:hover{box-shadow:0 14px 45px #bdfff755,0 1.5px 18px #19f1ffc8;transform:scale(1.025);}
+    @media (max-width:980px) {.dashboard{margin-top:6vh;}}
+    @media (max-width:680px){.dashboard-title{font-size:1.23rem;}.panel-title{font-size:1.2rem;}}
+    /* Utility animations */
+    @keyframes shake{0%{transform:translateX(0);}20%{transform:translateX(-4px);}
+      40%{transform:translateX(5px);}60%{transform:translateX(-3px);}
+      80%{transform:translateX(3px);}100%{transform:translateX(0);}}
+  </style>
+</head>
+<body>
+  <div id="smooth-bg"></div>
+  <canvas id="jarvis3d"></canvas>
+  <div id="hud-overlay">
+    <div class="logo">CYBER HUD SYSTEM</div>
+    <div class="label" id="label">Connecting to Secure Node...</div>
+    <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+    <div class="loading" id="loading">Loading <span id="percent">0</span>%</div>
+    <div class="access" id="access">Access Granted</div>
+  </div>
+  <div id="main-login">
+    <div class="glass-panel">
+      <div class="panel-title">CYBER LOGIN</div>
+      <div class="panel-sub">Authenticate to Continue</div>
+      <form class="loginform" autocomplete="off">
+        <input id="username" placeholder="USERNAME" spellcheck="false" required />
+        <input id="password" type="password" placeholder="PASSWORD" required />
+        <div class="loginerr" id="error-msg"></div>
+        <button type="submit" class="loginbtn">LOGIN</button>
+      </form>
+    </div>
+  </div>
+  <div id="main-content">
+    <div class="dashboard">
+      <div class="dashboard-title">CYBER HACKING DASHBOARD</div>
+      <div class="tag-bar">
+        <div class="tag">NETWORK</div>
+        <div class="tag">CRYPTO</div>
+        <div class="tag">WEB</div>
+        <div class="tag">MALWARE</div>
+      </div>
+      <div class="cards">
+        <div class="card">Network Hacking — Recon, sniffing, exploitation</div>
+        <div class="card">Cryptography — Encryption, hashing, steganography</div>
+        <div class="card">Ethical Hacking — Penetration testing, bug bounty</div>
+        <div class="card">Web Threats — OWASP Top 10, SQLi, XSS</div>
+        <div class="card">Malware — Reverse engineering, sandboxing</div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.min.js"></script>
+  <script>
+    // 3D HUD JARVIS-like scene
+    const canvas = document.getElementById('jarvis3d');
+    const renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:true});
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(64, window.innerWidth/window.innerHeight, 0.1, 60);
+    camera.position.set(0, 0, 13.2);
+    const glow = new THREE.PointLight(0x39fdec, 1.2, 35); scene.add(glow);
+    const coreGeo = new THREE.SphereGeometry(1.05, 36, 36);
+    const coreMat = new THREE.MeshBasicMaterial({color: 0x1bfdff, transparent: true, opacity: .97});
+    const core = new THREE.Mesh(coreGeo, coreMat); scene.add(core);
+    function hudRing(rad, color, thick=0.07, y=0, wire=0) {
+      const geo = new THREE.TorusGeometry(rad, thick, wire?9:32, 80);
+      let mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:wire?.31:.79, wireframe:!!wire});
+      let torus = new THREE.Mesh(geo, mat); torus.position.y = y; return torus;
+    }
+    let rings = [
+      hudRing(2.7, 0x19eaff, 0.08, 0, 1),
+      hudRing(2.16, 0x27faff, 0.06, 0),
+      hudRing(1.62, 0x0898ff, 0.09, 0, 1),
+      hudRing(1.18, 0x79faff, 0.05, 0)
+    ]; rings.forEach(r => scene.add(r));
+    const hexGeo = new THREE.CylinderGeometry(0.27,0.27,0.10,6);
+    const hexMat = new THREE.MeshBasicMaterial({color:0x26fff6,transparent:true,opacity:.70});
+    let hexes=[]; for(let i=0;i<7;i++){
+      let h=new THREE.Mesh(hexGeo,hexMat.clone()),a=i*Math.PI*2/7,dist=3+.5*Math.sin(i+1);
+      h.position.set(Math.cos(a)*dist,Math.sin(a)*dist,Math.sin(a*2)*1.1);scene.add(h);hexes.push(h);
+    }
+    const dotGeo=new THREE.SphereGeometry(0.092,13,13),dotMat=new THREE.MeshBasicMaterial({color:0x8bffff});
+    let dots=[];for(let i=0;i<11;i++){
+      let d=new THREE.Mesh(dotGeo,dotMat.clone());scene.add(d);dots.push(d);
+    }
+    let t0 = Date.now();
+    function animate() {
+      let t = (Date.now()-t0)*0.001;
+      camera.position.x = Math.sin(t*0.37)*1.32; camera.position.y=Math.cos(t*0.25)*1.18; camera.lookAt(0,0,0);
+      rings[0].rotation.z=t*0.37;rings[1].rotation.y=t*0.25;rings[2].rotation.x=t*0.53;rings[3].rotation.y=t*0.22;
+      core.scale.setScalar(1+.11*Math.sin(t*2.2));
+      hexes.forEach((h,i)=>{h.rotation.z=t*0.67+i;h.position.x=Math.cos(t*0.57+i)*(3+0.45*Math.sin(t/1.1+i));
+        h.position.y=Math.sin(t*0.65+i*1.19)*(2.8+0.64*Math.cos(t/1.8+i));});
+      dots.forEach((d,i)=>{let phi=t*0.88+i;d.position.set(Math.cos(phi)*1.14+(Math.sin(i+phi)*0.16),Math.sin(phi)*1.6+(Math.cos(i+phi*1.7)*0.12),Math.cos(t*0.73+i*3)*1.11);});
+      renderer.setSize(window.innerWidth,window.innerHeight); renderer.render(scene,camera); requestAnimationFrame(animate);
+    }
+    animate();
+    window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+    // HUD Overlay sequence
+    const label = document.getElementById('label'),
+          loading = document.getElementById('loading'),
+          percent = document.getElementById('percent'),
+          prog = document.getElementById('progress'),
+          bar = document.getElementById('bar'),
+          access = document.getElementById('access');
+    label.style.opacity = 1;
+    setTimeout(() => {
+      prog.style.opacity = 1; loading.style.opacity = 1;
+      let n = 0;
+      let loadingTimer = setInterval(()=>{
+        n += Math.random()*15+8;
+        if(n>100) n=100;
+        bar.style.width = n+"%";
+        percent.textContent = Math.round(n);
+        if(n>=100){
+          clearInterval(loadingTimer);
+          setTimeout(()=>{
+            label.style.opacity = 0; prog.style.opacity = 0; loading.style.opacity = 0;
+            setTimeout(()=>{
+              access.style.opacity = 1;
+              setTimeout(()=>{
+                document.getElementById('hud-overlay').style.opacity=0;
+                setTimeout(()=>{
+                  document.getElementById('hud-overlay').style.display='none';
+                  document.getElementById('main-login').style.display='flex';
+                },900);
+              },1150);
+            },450);
+          },620);
+        }
+      }, 60);
+    }, 950);
+    // --- LOGIN PANEL LOGIC ---
+    const loginForm = document.querySelector('.loginform');
+    const usernameField = document.getElementById('username');
+    const passwordField = document.getElementById('password');
+    const errorMsg = document.getElementById('error-msg');
+    loginForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorMsg.textContent = "";
+      errorMsg.classList.remove('show');
+      const user = usernameField.value.trim(), pass = passwordField.value;
+      if (user.toLowerCase() === "varun" && pass === "hacker2025") {
+        document.getElementById('main-login').style.display = "none";
+        document.getElementById('main-content').style.display = "flex";
+      } else {
+        errorMsg.textContent = "ACCESS DENIED - INVALID CREDENTIALS";
+        errorMsg.classList.add('show');
+        shake(document.querySelector('.glass-panel'));
+      }
+    });
+    // Ripple effect for login button
+    document.querySelector('.loginbtn').addEventListener('click', function(e){
+      const elem = this;
+      const rect = elem.getBoundingClientRect();
+      const ripple = document.createElement("span");
+      ripple.className = "ripple";
+      ripple.style.left = (e.clientX - rect.left) + "px";
+      ripple.style.top = (e.clientY - rect.top) + "px";
+      ripple.style.width = ripple.style.height = Math.max(rect.width, rect.height) + "px";
+      elem.appendChild(ripple);
+      ripple.addEventListener('animationend', () => ripple.remove());
+    });
+    // Shake for error
+    function shake(elem) {
+      elem.style.animation = 'shake 0.29s';
+      elem.addEventListener('animationend', () => {
+        elem.style.animation = '';
+      }, { once: true });
+    }
+  </script>
+</body>
+</html>
